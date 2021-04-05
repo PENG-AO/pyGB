@@ -2,6 +2,6 @@
 a gameboy emulator written in Python3
 
 - [x] bios
-- [ ] interrupt (half-done?)
+- [x] interrupt
 - [ ] memory bank
 - [ ] sound
