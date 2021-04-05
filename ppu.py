@@ -129,7 +129,6 @@ class PPU(object):
                         # whole frame ready, prepare to show a new screen and handle inputs
                         self.emu.frames += 1
                         self.updateLCD()
-                        self.handleEvents()
                     else:
                         self.updateMode(PPU.OAM_READ_MODE)
                     
@@ -290,7 +289,7 @@ class PPU(object):
                     if not (0 <= tile.x + dx < COLS): continue
 
                     x, y = self.scx + tile.x + dx, self.scy + tile.y + dy
-                    if tile.priority or pixels[x * RESIZE, y * RESIZE] == getColor(0):
+                    if tile.priority or pixels[x * RESIZE, y * RESIZE] == getColor(0, PPU.NOSTALGIC):
                         if tile.pixels[dy][dx] < 0: continue
                         PPU.fill(x, y, tile.pixels[dy][dx], pixels)
             del tile

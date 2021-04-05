@@ -39,15 +39,7 @@ class Emulator(object):
     def run(self, frames: int=-1) -> None:
         while self.frames != frames:
             self.step()
-            '''
-            if self.paused:
-                self.ppu.delay(100)
-            else:
-                self.tick()
-                self.ppu.updateLCD()
-                self.frames += 1
             self.ppu.handleEvents()
-            '''
     
     def read(self, addr: int) -> int:
         return self.mmu.read(addr)

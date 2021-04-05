@@ -1,5 +1,5 @@
 # z80 cpu
-from utils import toHex
+from utils import setBit, toHex
 # register F
 FLAG_C, FLAG_H, FLAG_N, FLAG_Z = 4, 5, 6, 7
 # addresses of registers
@@ -13,7 +13,7 @@ class Z80(object):
     __slots__ = (
         'A', 'B', 'C', 'D', 'E', 'F', 'H', 'L',
         'PC', 'SP', 'emu',
-        'interruptable', 'halted',
+        'halted', 'interruptable', 'pendingIntr',
         'opcode', 'opname', 'args', 'OP_MAP'
     )
 
@@ -42,8 +42,9 @@ class Z80(object):
         # reference of emulator
         self.emu = emu
         # interrupt
-        self.interruptable = False
         self.halted = False
+        self.interruptable = False
+        self.pendingIntr = 0x00
         # info of opcode
         self.opcode = 0x00
         self.opname = 'NOP'
@@ -269,41 +270,45 @@ class Z80(object):
     def setInterrupt(self, flag: int) -> None:
         self.emu.write(IF_ADDR, self.emu.read(IF_ADDR) | (1 << flag))
     
-    def handleInterrupted(self) -> bool:
-        if not self.interruptable:
-            return False
-        
+    def handleInterrupted(self) -> int:
         IF, IE = self.emu.read(IF_ADDR), self.emu.read(IE_ADDR)
+        pending = IF & IE
         for flag in range(5):
-            if (IF & (1 << flag)) and (IE & (1 << flag)):
+            if (pending >> flag) & 1:
                 # clear interrupt flag
-                self.emu.write(IF_ADDR, self.emu.read(IF_ADDR) & (0xFF - (1 << flag)))
-                self.interruptable = False
-                self.push(self.PC >> 8) # high addr
-                self.push(self.PC & 0xFF) # low addr
+                self.emu.write(IF_ADDR, setBit(IF, flag, 0))
                 break
         else:
-            return False
+            return 0
         
+        self.interruptable = False
+        self.halted = False
+        self.push(self.PC >> 8) # high addr
+        self.push(self.PC & 0xFF) # low addr
         if flag == IF_VBLANK:
-            self.PC = 0x0040
+            self.PC = 0x40
         elif flag == IF_STAT:
-            self.PC = 0x0048
+            self.PC = 0x48
         elif flag == IF_TIMER:
-            self.PC = 0x0050
+            self.PC = 0x50
         elif flag == IF_SERIAL:
-            self.PC = 0x0058
+            self.PC = 0x58
         elif flag == IF_JOYPAD:
-            self.PC = 0x0060
-        return True
+            self.PC = 0x60
+        return 20
     
     def step(self) -> int:
+        ticks = 0
+        if self.halted and self.pendingIntr != self.emu.read(IF_ADDR):
+            ticks += 4
+            self.halted = False
+        if self.interruptable or self.pendingIntr:
+            ticks += self.handleInterrupted()
         if self.halted:
-            if self.handleInterrupted():
-                self.halted = False
-            else:
-                return 4
-        return self.fetchAndExec()
+            ticks += 4
+        else:
+            ticks += self.fetchAndExec()
+        return ticks
 
 ############
 # op codes #
@@ -1225,9 +1230,8 @@ def LD_75(z80: Z80) -> int:
 # 0x76 : HALT
 # - - - -
 def HALT_76(z80: Z80) -> int:
-    print(f'*** HALT *** ({toHex(z80.PC)})')
-    if z80.interruptable:
-        z80.halted = True
+    z80.halted = True
+    z80.pendingIntr = z80.emu.read(IF_ADDR)
     return 4
 
 # 0x77 : LD (HL), A

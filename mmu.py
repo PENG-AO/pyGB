@@ -65,7 +65,7 @@ class MMU(object):
         elif addr == DMA_ADDR:
             # DMA
             self.requestDmaTransfer()
-            print(f'from {toHex(byte)}00 to FE00 (DMA)')
+            # print(f'from {toHex(byte)}00 to FE00 (DMA)')
         elif addr == BOOT_ADDR:
             # boot off
             self.remap2rom(byte)
@@ -87,7 +87,7 @@ class MMU(object):
             self.dmaSetDelay = False
             return 8
         else:
-            src = self.read(DMA_ADDR) << 8 + self.dmaCounter
+            src = (self.read(DMA_ADDR) << 8) + self.dmaCounter
             dst = 0xFE00 + self.dmaCounter
             self.write(dst, self.read(src))
             self.dmaCounter += 1
